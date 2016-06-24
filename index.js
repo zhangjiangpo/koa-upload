@@ -13,6 +13,8 @@ var os = require('os');
 var path = require('path');
 var bodyParse = require('koa-better-body')
 
+var router = require('koa-router')();
+
 // log requests
 
 app.use(logger());
@@ -20,16 +22,9 @@ app.use(logger());
 app.use(bodyParse())
 
 app.use(function *(next) {
-  this.params = this.body?this.body:'';
+  this.parames = this.method.toUpperCase() !== 'GET'?this.body:this.query;
   yield next;
 })
-// custom 404
-
-app.use(function *(next){
-  yield next;
-  if (this.body || !this.idempotent) return;
-  this.redirect('/404.html');
-});
 
 // serve files from ./public
 
@@ -37,12 +32,10 @@ app.use(serve(__dirname + '/public'));
 
 // handle uploads
 
-app.use(function *(next){
-  // ignore non-POSTs
-  if ('POST' != this.method) return yield next;
+router.post('/upload',function *(next){
 
   // multipart upload
-  var files = this.params.files;
+  var files = this.parames.files;
   if(files){
     for(var item in files){
       var tmpath = files[item]['path'];
@@ -53,9 +46,21 @@ app.use(function *(next){
       fs.createReadStream(tmpath).pipe(stream);//可读流通过管道写入可写流
     }
   }
-  this.redirect('/');
+  //this.redirect('/');
+  this.body = {success:true};
 });
 
+router.post('/user',function *(next){
+  console.dir(this.parames);
+  this.body = this.parames;
+})
+router.get('/user/:id',function *(next){
+  console.log(this.parames);
+  this.body = Object.assign({},this.parames,this.params);
+})
+
+app.use(router.routes())
+app.use(router.allowedMethods())
 // listen
 
 app.listen(3000);
